@@ -1,5 +1,5 @@
 require 'parslet'
-require_relative "number/parser"
+require_relative 'number/parser'
 
 class Template
   class Parser < Parslet::Parser
@@ -16,9 +16,7 @@ class Template
 
     # string
     rule(:string_character) do
-      opening_expression.absent? >>
-        opening_interpolation.absent? >>
-        any
+      opening_expression.absent? >> opening_interpolation.absent? >> any
     end
     rule(:escaped_string_character) do
       (backslash >> (n | t)) | (backslash.ignore >> any)
@@ -33,9 +31,8 @@ class Template
       double_quote.ignore >>
         (
           (
-            interpolation.as(:interpolation) |
-            expression.as(:expression) |
-            double_quote_string_character.repeat(1).as(:text)
+            interpolation.as(:interpolation) | expression.as(:expression) |
+              double_quote_string_character.repeat(1).as(:text)
           ).repeat(0)
         ) >> double_quote.ignore
     end
@@ -43,9 +40,8 @@ class Template
       single_quote.ignore >>
         (
           (
-            interpolation.as(:interpolation) |
-            expression.as(:expression) |
-            single_quote_string_character.repeat(1).as(:text)
+            interpolation.as(:interpolation) | expression.as(:expression) |
+              single_quote_string_character.repeat(1).as(:text)
           ).repeat(0)
         ) >> single_quote.ignore
     end
