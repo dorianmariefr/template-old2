@@ -58,8 +58,17 @@ class Template
     end
     rule(:name) { name_character.repeat(1) }
 
+    # boolean
+    rule(:boolean) { str('true') | str('false') }
+
+    # nothing
+    rule(:nothing) { str('nothing') }
+
     # value
-    rule(:value) { (number.as(:number) | string.as(:string) | name.as(:name)) }
+    rule(:value) do
+      nothing.as(:nothing) | boolean.as(:boolean) | number.as(:number) |
+        string.as(:string) | name.as(:name)
+    end
 
     # operator
     rule(:operator_character) { dot }

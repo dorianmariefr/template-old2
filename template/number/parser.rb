@@ -34,9 +34,7 @@ class Template
       rule(:space) { match('\s') }
 
       # infinity
-      rule(:infinity) do
-        str('Infinity') | str('infinity') | str('INFINITY') | str('♾')
-      end
+      rule(:infinity) { str('Infinity') }
 
       # base 16
       rule(:base_16_digit) do

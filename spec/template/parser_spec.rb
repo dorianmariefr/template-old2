@@ -16,6 +16,23 @@ RSpec.describe Template::Parser do
     it { is_expected.to eq([{ text: 'Hello' }]) }
   end
 
+  context 'nothing' do
+    let!(:template) { '{nothing}' }
+    it { is_expected.to eq([{ expression: [{ value: { nothing: "nothing" } }] }]) }
+  end
+
+  context "boolean" do
+    context 'true' do
+      let!(:template) { '{true}' }
+      it { is_expected.to eq([{ expression: [{ value: { boolean: "true" } }] }]) }
+    end
+
+    context 'false' do
+      let!(:template) { '{false}' }
+      it { is_expected.to eq([{ expression: [{ value: { boolean: "false" } }] }]) }
+    end
+  end
+
   context 'with an interpolation' do
     let!(:template) { 'Hello {{user.first_name}}' }
     it do
