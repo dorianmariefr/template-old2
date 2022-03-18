@@ -3,7 +3,7 @@ RSpec.configure do |config|
   config.filter_run_when_matching :focus
   config.disable_monkey_patching!
   config.warnings = true
-  config.default_formatter = "doc"
+  config.default_formatter = 'doc'
   config.order = :random
 
   config.expect_with :rspec do |expectations|

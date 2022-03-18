@@ -1,4 +1,5 @@
 require 'parslet'
+require_relative "number/parser"
 
 class Template
   class Parser < Parslet::Parser
@@ -14,51 +15,62 @@ class Template
     rule(:t) { str('t') }
 
     # string
+    rule(:string_character) do
+      opening_expression.absent? >>
+        opening_interpolation.absent? >>
+        any
+    end
     rule(:escaped_string_character) do
       (backslash >> (n | t)) | (backslash.ignore >> any)
     end
     rule(:double_quote_string_character) do
-      escaped_string_character | (double_quote.absent? >> any)
+      escaped_string_character | (double_quote.absent? >> string_character)
     end
     rule(:single_quote_string_character) do
-      escaped_string_character | (single_quote.absent? >> any)
+      escaped_string_character | (single_quote.absent? >> string_character)
     end
     rule(:double_quote_string) do
       double_quote.ignore >>
-        double_quote_string_character.repeat(0) >>
-        double_quote.ignore
+        (
+          (
+            interpolation.as(:interpolation) |
+            expression.as(:expression) |
+            double_quote_string_character.repeat(1).as(:text)
+          ).repeat(0)
+        ) >> double_quote.ignore
     end
     rule(:single_quote_string) do
       single_quote.ignore >>
-        single_quote_string_character.repeat(0) >>
-        single_quote.ignore
+        (
+          (
+            interpolation.as(:interpolation) |
+            expression.as(:expression) |
+            single_quote_string_character.repeat(1).as(:text)
+          ).repeat(0)
+        ) >> single_quote.ignore
     end
-    rule(:string) do
-      double_quote_string | single_quote_string
-    end
+    rule(:string) { double_quote_string | single_quote_string }
+
+    # number
+    rule(:number) { Template::Number::Parser.new }
 
     # name
     rule(:name_character) do
-      opening_expression.absent? >>
-        closing_expression.absent? >>
-        opening_interpolation.absent? >>
-        closing_interpolation.absent? >>
-        operator.absent? >>
-        any
+      opening_expression.absent? >> closing_expression.absent? >>
+        opening_interpolation.absent? >> closing_interpolation.absent? >>
+        operator.absent? >> any
     end
     rule(:name) { name_character.repeat(1) }
 
     # value
-    rule(:value) { (string.as(:string) | name.as(:name)) }
+    rule(:value) { (number.as(:number) | string.as(:string) | name.as(:name)) }
 
     # operator
-    rule(:operator_character) do
-      dot
-    end
+    rule(:operator_character) { dot }
     rule(:operator) { operator_character.repeat(1) }
 
     # statement
-    rule(:statement)do
+    rule(:statement) do
       (value.as(:value) >> operator.as(:operator) >> statement.as(:statement)) |
         value.as(:value)
     end
@@ -88,11 +100,9 @@ class Template
 
     rule(:template) do
       (
-        interpolation.as(:interpolation) |
-        expression.as(:expression) |
-        text.as(:text)
-      ).repeat(1) |
-        empty.as(:text).repeat(1, 1)
+        interpolation.as(:interpolation) | expression.as(:expression) |
+          text.as(:text)
+      ).repeat(1) | empty.as(:text).repeat(1, 1)
     end
 
     root(:template)
