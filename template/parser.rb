@@ -74,16 +74,17 @@ class Template
     rule(:nothing) { str('nothing') }
 
     # list
+    rule(:list_value) { implicit_dictionnary.as(:dictionnary) | value }
     rule(:implicit_list) do
       value.as(:first) >> spaces? >> comma >>
         (
-          spaces? >> value.as(:second) >>
-            (comma >> spaces? >> value).repeat(0).as(:others)
+          spaces? >> list_value.as(:second) >>
+            (comma >> spaces? >> list_value).repeat(0).as(:others)
         ).maybe
     end
     rule(:list) do
-      left_square_bracket >> spaces? >> value.as(:first) >>
-        (comma >> spaces? >> value).repeat(0).as(:others) >> spaces? >>
+      left_square_bracket >> spaces? >> list_value.as(:first) >>
+      (comma >> spaces? >> list_value).repeat(0).as(:others) >> spaces? >>
         right_square_bracket
     end
 
@@ -93,6 +94,10 @@ class Template
     rule(:key_value) do
       (short_key | long_key).as(:key) >> spaces? >> value.as(:value)
     end
+    rule(:implicit_dictionnary) do
+      key_value.as(:first) >>
+        (spaces? >> comma >> spaces? >> key_value).repeat(0).as(:others)
+    end
     rule(:dictionnary) do
       left_curly_bracket >> spaces? >> key_value.as(:first) >>
         (comma >> spaces? >> key_value).repeat(0).as(:others) >> spaces? >>
@@ -101,9 +106,9 @@ class Template
 
     # value
     rule(:value) do
-      dictionnary.as(:dictionnary) | list.as(:list) | nothing.as(:nothing) |
-        boolean.as(:boolean) | number.as(:number) | string.as(:string) |
-        name.as(:name)
+      dictionnary.as(:dictionnary) | list.as(:list) |
+      nothing.as(:nothing) | boolean.as(:boolean) | number.as(:number) |
+        string.as(:string) | name.as(:name)
     end
 
     # operator
@@ -112,7 +117,7 @@ class Template
     # statement
     rule(:statement) do
       (value >> operator.as(:operator) >> statement.as(:statement)) |
-        (implicit_list.as(:list) | value)
+        (implicit_dictionnary.as(:dictionnary) | implicit_list.as(:list) | value)
     end
     rule(:statements) { statement.repeat(1) }
 

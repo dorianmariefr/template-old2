@@ -3,8 +3,20 @@ require_relative '../../template/parser'
 RSpec.describe Template::Parser do
   let!(:template) { '' }
 
+  def sanitize(object)
+    if object.is_a?(Parslet::Slice)
+      object.to_s
+    elsif object.is_a?(Hash)
+      object.transform_values { |value| sanitize(value) }
+    elsif object.is_a?(Array)
+      object.map { |value| sanitize(value) }
+    else
+      raise NotImplementedError, object.class
+    end
+  end
+
   subject do
-    described_class.new.parse(template)
+    sanitize(described_class.new.parse(template))
   rescue Parslet::ParseFailed => e
     puts e.parse_failure_cause.ascii_tree
     raise e
@@ -211,6 +223,77 @@ RSpec.describe Template::Parser do
           }
         )
       end
+    end
+
+    context 'implicit dictionnary with single key value pair' do
+      let!(:template) { '{name: "Dorian"}' }
+
+      it do
+        matches_expression(
+          dictionnary: {
+            first: {
+              key: {
+                string: 'name'
+              },
+              value: {
+                string: [{ text: 'Dorian' }]
+              }
+            },
+            others: []
+          }
+        )
+      end
+    end
+
+    context 'implicit dictionnary with multiple key value pairs' do
+      let!(:template) { '{name: "Dorian", twitter: "@dorianmariefr"}' }
+
+      it do
+        matches_expression(
+          dictionnary: {
+            first: {
+              key: {
+                string: 'name'
+              },
+              value: {
+                string: [{ text: 'Dorian' }]
+              }
+            },
+            others: [
+              {
+                key: {
+                  string: 'twitter'
+                },
+                value: {
+                  string: [{ text: '@dorianmariefr' }]
+                }
+              },
+            ]
+          }
+        )
+      end
+    end
+  end
+
+  context "implicit dictionnary inside a list" do
+    let!(:template) { '{1, name: "Dorian"}' }
+
+    it do
+      matches_expression(
+        list: {
+          first: { number: { base_10: { whole: "1" } } },
+          second: {
+            dictionnary: {
+              first: {
+                key: { string: "name" },
+                value: { string: [{ text: "Dorian" }] }
+              },
+              others: []
+            }
+          },
+          others: []
+        }
+      )
     end
   end
 end
