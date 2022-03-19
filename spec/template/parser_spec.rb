@@ -39,7 +39,7 @@ RSpec.describe Template::Parser do
   end
 
   context 'with an interpolation' do
-    let!(:template) { 'Hello {{user.first_name}}' }
+    let!(:template) { 'Hello {=user.first_name}' }
     it do
       is_expected.to eq(
         [
@@ -95,7 +95,7 @@ RSpec.describe Template::Parser do
     end
 
     context 'interpolation' do
-      let!(:template) { '{"Hello {{user}}"}' }
+      let!(:template) { '{"Hello {=user}"}' }
 
       it do
         matches_expression(
@@ -157,6 +157,57 @@ RSpec.describe Template::Parser do
               }
             },
             others: [{ nothing: 'nothing' }]
+          }
+        )
+      end
+    end
+  end
+
+  context 'dictionnaries' do
+    context 'explicit dictionnary with single key value pair' do
+      let!(:template) { '{{name: "Dorian"}}' }
+
+      it do
+        matches_expression(
+          dictionnary: {
+            first: {
+              key: {
+                string: 'name'
+              },
+              value: {
+                string: [{ text: 'Dorian' }]
+              }
+            },
+            others: []
+          }
+        )
+      end
+    end
+
+    context 'explicit dictionnary with multiple key value pairs' do
+      let!(:template) { '{{name: "Dorian", twitter: "@dorianmariefr"}}' }
+
+      it do
+        matches_expression(
+          dictionnary: {
+            first: {
+              key: {
+                string: 'name'
+              },
+              value: {
+                string: [{ text: 'Dorian' }]
+              }
+            },
+            others: [
+              {
+                key: {
+                  string: 'twitter'
+                },
+                value: {
+                  string: [{ text: '@dorianmariefr' }]
+                }
+              }
+            ]
           }
         )
       end

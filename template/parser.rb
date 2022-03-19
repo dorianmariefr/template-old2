@@ -14,6 +14,9 @@ class Template
     rule(:single_quote) { str("'") }
     rule(:backslash) { str('\\') }
     rule(:comma) { str(',') }
+    rule(:colon) { str(':') }
+    rule(:equal) { str('=') }
+    rule(:greater_than) { str('>') }
     rule(:n) { str('n') }
     rule(:t) { str('t') }
 
@@ -22,9 +25,7 @@ class Template
     rule(:spaces?) { spaces.maybe }
 
     # string
-    rule(:string_character) do
-      opening_expression.absent? >> opening_interpolation.absent? >> any
-    end
+    rule(:string_character) { left_curly_bracket.absent? >> any }
     rule(:escaped_string_character) do
       (backslash >> (n | t)) | (backslash.ignore >> any)
     end
@@ -61,7 +62,8 @@ class Template
     rule(:name_character) do
       left_curly_bracket.absent? >> right_curly_bracket.absent? >>
         left_square_bracket.absent? >> right_square_bracket.absent? >>
-        comma.absent? >> operator.absent? >> spaces.absent? >> any
+        colon.absent? >> comma.absent? >> operator.absent? >> spaces.absent? >>
+        any
     end
     rule(:name) { name_character.repeat(1) }
 
@@ -85,15 +87,27 @@ class Template
         right_square_bracket
     end
 
+    # dictionnary
+    rule(:short_key) { name.as(:string) >> colon }
+    rule(:long_key) { value >> spaces? >> (colon | (equal >> greater_than)) }
+    rule(:key_value) do
+      (short_key | long_key).as(:key) >> spaces? >> value.as(:value)
+    end
+    rule(:dictionnary) do
+      left_curly_bracket >> spaces? >> key_value.as(:first) >>
+        (comma >> spaces? >> key_value).repeat(0).as(:others) >> spaces? >>
+        right_curly_bracket
+    end
+
     # value
     rule(:value) do
-      list.as(:list) | nothing.as(:nothing) | boolean.as(:boolean) |
-        number.as(:number) | string.as(:string) | name.as(:name)
+      dictionnary.as(:dictionnary) | list.as(:list) | nothing.as(:nothing) |
+        boolean.as(:boolean) | number.as(:number) | string.as(:string) |
+        name.as(:name)
     end
 
     # operator
-    rule(:operator_character) { dot }
-    rule(:operator) { operator_character.repeat(1) }
+    rule(:operator) { dot | equal | greater_than }
 
     # statement
     rule(:statement) do
@@ -103,8 +117,8 @@ class Template
     rule(:statements) { statement.repeat(1) }
 
     # interpolation
-    rule(:opening_interpolation) { left_curly_bracket >> left_curly_bracket }
-    rule(:closing_interpolation) { right_curly_bracket >> right_curly_bracket }
+    rule(:opening_interpolation) { left_curly_bracket >> equal }
+    rule(:closing_interpolation) { right_curly_bracket }
     rule(:interpolation) do
       opening_interpolation.ignore >> spaces?.ignore >> statements >>
         spaces?.ignore >> closing_interpolation.ignore
