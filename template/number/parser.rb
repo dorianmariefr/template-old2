@@ -57,12 +57,8 @@ class Template
       rule(:base_10_digit) do
         zero | one | two | three | four | five | six | seven | eight | nine
       end
-      rule(:base_10_whole_plain) do
-        base_10_digit.repeat(1)
-      end
-      rule(:base_10_digit_group) do
-        base_10_digit.repeat(3, 3)
-      end
+      rule(:base_10_whole_plain) { base_10_digit.repeat(1) }
+      rule(:base_10_digit_group) { base_10_digit.repeat(3, 3) }
       rule(:base_10_whole_spaces) do
         base_10_digit.repeat(1, 3) >>
           (space.ignore >> base_10_digit_group).repeat(1)
@@ -76,20 +72,13 @@ class Template
           (comma.ignore >> base_10_digit_group).repeat(1)
       end
       rule(:base_10_whole) do
-        base_10_whole_spaces |
-          base_10_whole_underscores |
-          base_10_whole_commas |
-          base_10_whole_plain
+        base_10_whole_spaces | base_10_whole_underscores |
+          base_10_whole_commas | base_10_whole_plain
       end
-      rule(:base_10_decimal) do
-        dot.ignore >> base_10_digit.repeat(1)
-      end
-      rule(:base_10_exponent) do
-        e.ignore >> base_10_digit.repeat(1)
-      end
+      rule(:base_10_decimal) { dot.ignore >> base_10_digit.repeat(1) }
+      rule(:base_10_exponent) { e.ignore >> base_10_digit.repeat(1) }
       rule(:base_10_number) do
-        base_10_whole.as(:whole) >>
-          base_10_decimal.as(:decimal).maybe >>
+        base_10_whole.as(:whole) >> base_10_decimal.as(:decimal).maybe >>
           base_10_exponent.as(:exponent).maybe
       end
 

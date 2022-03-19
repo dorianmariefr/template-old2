@@ -23,18 +23,18 @@ RSpec.describe Template::Parser do
 
   context 'nothing' do
     let!(:template) { '{nothing}' }
-    it { matches_expression(value: { nothing: 'nothing' }) }
+    it { matches_expression(nothing: 'nothing') }
   end
 
   context 'boolean' do
     context 'true' do
       let!(:template) { '{true}' }
-      it { matches_expression(value: { boolean: 'true' }) }
+      it { matches_expression(boolean: 'true') }
     end
 
     context 'false' do
       let!(:template) { '{false}' }
-      it { matches_expression(value: { boolean: 'false' }) }
+      it { matches_expression(boolean: 'false') }
     end
   end
 
@@ -46,17 +46,7 @@ RSpec.describe Template::Parser do
           { text: 'Hello ' },
           {
             interpolation: [
-              {
-                value: {
-                  name: 'user'
-                },
-                operator: '.',
-                statement: {
-                  value: {
-                    name: 'first_name'
-                  }
-                }
-              }
+              { name: 'user', operator: '.', statement: { name: 'first_name' } }
             ]
           }
         ]
@@ -76,17 +66,7 @@ RSpec.describe Template::Parser do
         [
           {
             expression: [
-              {
-                value: {
-                  name: 'users'
-                },
-                operator: '.',
-                statement: {
-                  value: {
-                    name: 'pop'
-                  }
-                }
-              }
+              { name: 'users', operator: '.', statement: { name: 'pop' } }
             ]
           }
         ]
@@ -96,9 +76,7 @@ RSpec.describe Template::Parser do
 
   context 'strings' do
     def matches_string(string)
-      is_expected.to eq(
-        [{ expression: [{ value: { string: [{ text: string }] } }] }]
-      )
+      is_expected.to eq([{ expression: [{ string: [{ text: string }] }] }])
     end
 
     context 'double quote' do
@@ -121,12 +99,7 @@ RSpec.describe Template::Parser do
 
       it do
         matches_expression(
-          value: {
-            string: [
-              { text: 'Hello ' },
-              { interpolation: [{ value: { name: 'user' } }] }
-            ]
-          }
+          string: [{ text: 'Hello ' }, { interpolation: [{ name: 'user' }] }]
         )
       end
     end
@@ -138,12 +111,11 @@ RSpec.describe Template::Parser do
 
       it do
         matches_expression(
-          value: {
-            list: [
-              { value: { boolean: 'true' } },
-              { value: { boolean: 'false' } },
-              { value: { nothing: 'nothing' } }
-            ]
+          list: {
+            first: {
+              boolean: 'true'
+            },
+            others: [{ boolean: 'false' }, { nothing: 'nothing' }]
           }
         )
       end
@@ -154,12 +126,14 @@ RSpec.describe Template::Parser do
 
       it do
         matches_expression(
-          value: {
-            list: [
-              { value: { boolean: 'true' } },
-              { value: { boolean: 'false' } },
-              { value: { nothing: 'nothing' } }
-            ]
+          list: {
+            first: {
+              boolean: 'true'
+            },
+            second: {
+              boolean: 'false'
+            },
+            others: [{ nothing: 'nothing' }]
           }
         )
       end
@@ -170,19 +144,19 @@ RSpec.describe Template::Parser do
 
       it do
         matches_expression(
-          value: {
-            list: [
-              { value: { boolean: 'true' } },
-              {
-                value: {
-                  list: [
-                    { value: { boolean: 'false' } },
-                    { value: { boolean: 'true' } }
-                  ]
-                }
-              },
-              { value: { nothing: 'nothing' } }
-            ]
+          list: {
+            first: {
+              boolean: 'true'
+            },
+            second: {
+              list: {
+                first: {
+                  boolean: 'false'
+                },
+                others: [{ boolean: 'true' }]
+              }
+            },
+            others: [{ nothing: 'nothing' }]
           }
         )
       end

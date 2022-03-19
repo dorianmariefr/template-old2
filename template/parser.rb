@@ -5,14 +5,21 @@ class Template
   class Parser < Parslet::Parser
     rule(:empty) { str('') }
     rule(:backslash) { str('\\') }
-    rule(:opening_bracket) { str('{') }
-    rule(:closing_bracket) { str('}') }
+    rule(:left_curly_bracket) { str('{') }
+    rule(:right_curly_bracket) { str('}') }
+    rule(:left_square_bracket) { str('[') }
+    rule(:right_square_bracket) { str(']') }
     rule(:dot) { str('.') }
     rule(:double_quote) { str('"') }
     rule(:single_quote) { str("'") }
     rule(:backslash) { str('\\') }
+    rule(:comma) { str(',') }
     rule(:n) { str('n') }
     rule(:t) { str('t') }
+
+    # spaces
+    rule(:spaces) { match('\s').repeat(1) }
+    rule(:spaces?) { spaces.maybe }
 
     # string
     rule(:string_character) do
@@ -52,9 +59,9 @@ class Template
 
     # name
     rule(:name_character) do
-      opening_expression.absent? >> closing_expression.absent? >>
-        opening_interpolation.absent? >> closing_interpolation.absent? >>
-        operator.absent? >> any
+      left_curly_bracket.absent? >> right_curly_bracket.absent? >>
+        left_square_bracket.absent? >> right_square_bracket.absent? >>
+        comma.absent? >> operator.absent? >> spaces.absent? >> any
     end
     rule(:name) { name_character.repeat(1) }
 
@@ -64,10 +71,24 @@ class Template
     # nothing
     rule(:nothing) { str('nothing') }
 
+    # list
+    rule(:implicit_list) do
+      value.as(:first) >> spaces? >> comma >>
+        (
+          spaces? >> value.as(:second) >>
+            (comma >> spaces? >> value).repeat(0).as(:others)
+        ).maybe
+    end
+    rule(:list) do
+      left_square_bracket >> spaces? >> value.as(:first) >>
+        (comma >> spaces? >> value).repeat(0).as(:others) >> spaces? >>
+        right_square_bracket
+    end
+
     # value
     rule(:value) do
-      nothing.as(:nothing) | boolean.as(:boolean) | number.as(:number) |
-        string.as(:string) | name.as(:name)
+      list.as(:list) | nothing.as(:nothing) | boolean.as(:boolean) |
+        number.as(:number) | string.as(:string) | name.as(:name)
     end
 
     # operator
@@ -76,28 +97,30 @@ class Template
 
     # statement
     rule(:statement) do
-      (value.as(:value) >> operator.as(:operator) >> statement.as(:statement)) |
-        value.as(:value)
+      (value >> operator.as(:operator) >> statement.as(:statement)) |
+        (implicit_list.as(:list) | value)
     end
     rule(:statements) { statement.repeat(1) }
 
     # interpolation
-    rule(:opening_interpolation) { opening_bracket >> opening_bracket }
-    rule(:closing_interpolation) { closing_bracket >> closing_bracket }
+    rule(:opening_interpolation) { left_curly_bracket >> left_curly_bracket }
+    rule(:closing_interpolation) { right_curly_bracket >> right_curly_bracket }
     rule(:interpolation) do
-      opening_interpolation.ignore >> statements >> closing_interpolation.ignore
+      opening_interpolation.ignore >> spaces?.ignore >> statements >>
+        spaces?.ignore >> closing_interpolation.ignore
     end
 
     # expression
-    rule(:opening_expression) { opening_bracket }
-    rule(:closing_expression) { closing_bracket }
+    rule(:opening_expression) { left_curly_bracket }
+    rule(:closing_expression) { right_curly_bracket }
     rule(:expression) do
-      opening_expression.ignore >> statements >> closing_expression.ignore
+      opening_expression.ignore >> spaces?.ignore >> statements >>
+        spaces?.ignore >> closing_expression.ignore
     end
 
     # text
     rule(:unescaped_text_character) do
-      opening_bracket.absent? >> closing_bracket.absent? >> any
+      left_curly_bracket.absent? >> right_curly_bracket.absent? >> any
     end
     rule(:escaped_text_character) { backslash.ignore >> any }
     rule(:text_character) { escaped_text_character | unescaped_text_character }
