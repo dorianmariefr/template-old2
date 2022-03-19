@@ -36,7 +36,7 @@ RSpec.describe Template::Number::Parser do
     context 'with an exponent' do
       let!(:number) { '1e10' }
       it do
-        is_expected.to eq(base_10: { whole: '1', exponent: { whole: '10' } })
+        is_expected.to eq(base_10: { whole: '1', exponent: '10' })
       end
     end
 

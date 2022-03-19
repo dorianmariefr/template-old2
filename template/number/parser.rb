@@ -4,6 +4,7 @@ class Template
   class Number
     # 12,735.23 is parsed as { base_10: { whole: '12735', decimal: '23' } }
     class Parser < Parslet::Parser
+      rule(:space) { str(' ') }
       rule(:minus) { str('-') }
       rule(:plus) { str('+') }
       rule(:dot) { str('.') }
@@ -29,9 +30,6 @@ class Template
       rule(:x) { str('x') | str('X') }
       rule(:o) { str('o') | str('O') }
       rule(:b) { str('b') | str('b') }
-
-      # space
-      rule(:space) { match('\s') }
 
       # infinity
       rule(:infinity) { str('Infinity') }
@@ -59,15 +57,40 @@ class Template
       rule(:base_10_digit) do
         zero | one | two | three | four | five | six | seven | eight | nine
       end
+      rule(:base_10_whole_plain) do
+        base_10_digit.repeat(1)
+      end
+      rule(:base_10_digit_group) do
+        base_10_digit.repeat(3, 3)
+      end
+      rule(:base_10_whole_spaces) do
+        base_10_digit.repeat(1, 3) >>
+          (space.ignore >> base_10_digit_group).repeat(1)
+      end
+      rule(:base_10_whole_underscores) do
+        base_10_digit.repeat(1, 3) >>
+          (underscore.ignore >> base_10_digit_group).repeat(1)
+      end
+      rule(:base_10_whole_commas) do
+        base_10_digit.repeat(1, 3) >>
+          (comma.ignore >> base_10_digit_group).repeat(1)
+      end
+      rule(:base_10_whole) do
+        base_10_whole_spaces |
+          base_10_whole_underscores |
+          base_10_whole_commas |
+          base_10_whole_plain
+      end
+      rule(:base_10_decimal) do
+        dot.ignore >> base_10_digit.repeat(1)
+      end
+      rule(:base_10_exponent) do
+        e.ignore >> base_10_digit.repeat(1)
+      end
       rule(:base_10_number) do
-        (base_10_digit | space.ignore | underscore.ignore | comma.ignore)
-          .repeat(1)
-          .as(:whole) >>
-          (
-            dot.ignore >>
-              (base_10_digit | space.ignore | underscore.ignore).repeat(1)
-          ).as(:decimal).maybe >>
-          (e.ignore >> base_10_number).as(:exponent).maybe
+        base_10_whole.as(:whole) >>
+          base_10_decimal.as(:decimal).maybe >>
+          base_10_exponent.as(:exponent).maybe
       end
 
       rule(:number) do

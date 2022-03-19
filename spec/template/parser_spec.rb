@@ -2,11 +2,16 @@ require_relative '../../template/parser'
 
 RSpec.describe Template::Parser do
   let!(:template) { '' }
+
   subject do
     described_class.new.parse(template)
   rescue Parslet::ParseFailed => e
     puts e.parse_failure_cause.ascii_tree
     raise e
+  end
+
+  def matches_expression(expression)
+    is_expected.to eq([{ expression: [expression] }])
   end
 
   it { is_expected.to eq([{ text: '' }]) }
@@ -18,18 +23,18 @@ RSpec.describe Template::Parser do
 
   context 'nothing' do
     let!(:template) { '{nothing}' }
-    it { is_expected.to eq([{ expression: [{ value: { nothing: "nothing" } }] }]) }
+    it { matches_expression(value: { nothing: 'nothing' }) }
   end
 
-  context "boolean" do
+  context 'boolean' do
     context 'true' do
       let!(:template) { '{true}' }
-      it { is_expected.to eq([{ expression: [{ value: { boolean: "true" } }] }]) }
+      it { matches_expression(value: { boolean: 'true' }) }
     end
 
     context 'false' do
       let!(:template) { '{false}' }
-      it { is_expected.to eq([{ expression: [{ value: { boolean: "false" } }] }]) }
+      it { matches_expression(value: { boolean: 'false' }) }
     end
   end
 
@@ -115,21 +120,70 @@ RSpec.describe Template::Parser do
       let!(:template) { '{"Hello {{user}}"}' }
 
       it do
-        is_expected.to eq(
-          [
-            {
-              expression: [
-                {
-                  value: {
-                    string: [
-                      { text: 'Hello ' },
-                      { interpolation: [{ value: { name: 'user' } }] }
-                    ]
-                  }
+        matches_expression(
+          value: {
+            string: [
+              { text: 'Hello ' },
+              { interpolation: [{ value: { name: 'user' } }] }
+            ]
+          }
+        )
+      end
+    end
+  end
+
+  context 'lists' do
+    context 'explicit list' do
+      let!(:template) { '{[true, false, nothing]}' }
+
+      it do
+        matches_expression(
+          value: {
+            list: [
+              { value: { boolean: 'true' } },
+              { value: { boolean: 'false' } },
+              { value: { nothing: 'nothing' } }
+            ]
+          }
+        )
+      end
+    end
+
+    context 'implicit list' do
+      let!(:template) { '{true, false, nothing}' }
+
+      it do
+        matches_expression(
+          value: {
+            list: [
+              { value: { boolean: 'true' } },
+              { value: { boolean: 'false' } },
+              { value: { nothing: 'nothing' } }
+            ]
+          }
+        )
+      end
+    end
+
+    context 'nested list' do
+      let!(:template) { '{true, [false, true], nothing}' }
+
+      it do
+        matches_expression(
+          value: {
+            list: [
+              { value: { boolean: 'true' } },
+              {
+                value: {
+                  list: [
+                    { value: { boolean: 'false' } },
+                    { value: { boolean: 'true' } }
+                  ]
                 }
-              ]
-            }
-          ]
+              },
+              { value: { nothing: 'nothing' } }
+            ]
+          }
         )
       end
     end
