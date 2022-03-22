@@ -34,7 +34,9 @@ class Template
       error = parse_error(e.parse_failure_cause).flatten.sort_by(&:pos).last
       if trace
         errors = [error]
-        errors << error while error = error.parent
+        while error = error.parent
+          errors << error
+        end
         errors.reverse.each.with_index do |error, index|
           print_error(error, index: index)
         end
@@ -44,19 +46,20 @@ class Template
     end
 
     def self.print_error(error, index: 0)
-      puts "  " * index + error.message
-      puts "  " * index + error.source
-      puts "  " * index + " " * error.pos + "^"
+      puts '  ' * index + error.message
+      puts '  ' * index + error.source
+      puts '  ' * index + ' ' * error.pos + '^'
     end
 
     def self.parse_error(error, parent: nil)
-      error = Template::Helpers::Error.new(
-        pos: error.pos,
-        message: error.message,
-        source: error.source,
-        parent: parent,
-        children: error.children,
-      )
+      error =
+        Template::Helpers::Error.new(
+          pos: error.pos,
+          message: error.message,
+          source: error.source,
+          parent: parent,
+          children: error.children
+        )
 
       [error] + error.children.map { |child| parse_error(child, parent: error) }
     end

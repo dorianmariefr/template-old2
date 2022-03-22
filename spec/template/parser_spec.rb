@@ -74,15 +74,7 @@ RSpec.describe Template::Parser do
         [
           {
             code: [
-              {
-                call: {
-                  name: 'users',
-                  operator: '.',
-                  call: {
-                    name: 'pop'
-                  }
-                },
-              }
+              { call: { name: 'users', operator: '.', call: { name: 'pop' } } }
             ]
           }
         ]
@@ -416,7 +408,9 @@ RSpec.describe Template::Parser do
         matches_code(
           define: {
             name: 'title',
-            body: { template: [{ text: 'Home' }] }
+            body: {
+              template: [{ text: 'Home' }]
+            }
           }
         )
       end
@@ -509,7 +503,7 @@ RSpec.describe Template::Parser do
 
   context 'if, else if, else' do
     context 'if value' do
-      let!(:template) { '{if item.parent}{render(item.parent)}{end}'}
+      let!(:template) { '{if item.parent}{render(item.parent)}{end}' }
 
       it do
         matches_code(
@@ -518,31 +512,135 @@ RSpec.describe Template::Parser do
               call: {
                 name: 'item',
                 operator: '.',
-                call: { name: 'parent' }
+                call: {
+                  name: 'parent'
+                }
               }
             },
             if_body: {
-              template: [{
-                code: [{
-                  call: {
-                    name: 'render',
-                    arguments: {
-                      first: {
-                        call: {
-                          name: 'item',
-                          operator: '.',
-                          call: { name: 'parent' }
+              template: [
+                {
+                  code: [
+                    {
+                      call: {
+                        name: 'render',
+                        arguments: {
+                          first: {
+                            call: {
+                              name: 'item',
+                              operator: '.',
+                              call: {
+                                name: 'parent'
+                              }
+                            }
+                          },
+                          others: []
                         }
-                      },
-                      others: []
+                      }
                     }
-                  }
-                }]
-              }]
+                  ]
+                }
+              ]
             }
           }
         )
       end
     end
+
+    context 'else' do
+      let!(:template) { '{if guest}Guest{else}Not guest{end}' }
+      it do
+        matches_code(
+          if: {
+            else_body: {
+              template: [{ text: 'Not guest' }]
+            },
+            if_body: {
+              template: [{ text: 'Guest' }]
+            },
+            if_statement: {
+              call: {
+                name: 'guest'
+              }
+            }
+          }
+        )
+      end
+    end
+
+    context 'else if' do
+      let!(:template) { '{if guest}Guest{else if user}User{end}' }
+      it do
+        matches_code(
+          if: {
+            else_if_body: {
+              template: [{ text: 'User' }]
+            },
+            else_if_statement: {
+              call: {
+                name: 'user'
+              }
+            },
+            if_body: {
+              template: [{ text: 'Guest' }]
+            },
+            if_statement: {
+              call: {
+                name: 'guest'
+              }
+            }
+          }
+        )
+      end
+    end
+
+    context 'else if and else' do
+      let!(:template) { '{if admin}Admin{else if user}User{else}Guest{end}' }
+      it do
+        matches_code(
+          if: {
+            else_body: {
+              template: [{ text: 'Guest' }]
+            },
+            else_if_body: {
+              template: [{ text: 'User' }]
+            },
+            else_if_statement: {
+              call: {
+                name: 'user'
+              }
+            },
+            if_body: {
+              template: [{ text: 'Admin' }]
+            },
+            if_statement: {
+              call: {
+                name: 'admin'
+              }
+            }
+          }
+        )
+      end
+    end
+  end
+
+  context 'real world template' do
+    let!(:template) { <<~TEMPLATE }
+      {define render(item)}
+        <p>{link_to(item.user.name, item.user.url)}</p>
+
+        {markdown(item.content)}
+
+        <p>{link_to(item.created_at.to_formatted_s(:long), item.url)}</p>
+
+        {if item.parent}
+          {render(item.parent)}
+        {end}
+      {end}
+
+      {render(item)}
+      TEMPLATE
+
+    it { expect { subject }.to_not raise_error }
   end
 end

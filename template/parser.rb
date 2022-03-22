@@ -25,6 +25,7 @@ class Template
     rule(:define) { str('define') }
     rule(:end_keyword) { str('end') }
     rule(:if_keyword) { str('if') }
+    rule(:else_keyword) { str('else') }
 
     # spaces
     rule(:space) { str(' ') }
@@ -73,7 +74,7 @@ class Template
     end
     rule(:name) do
       define.absent? >> end_keyword.absent? >> if_keyword.absent? >>
-        name_character.repeat(1)
+        else_keyword.absent? >> name_character.repeat(1)
     end
 
     # define arguments
@@ -106,10 +107,10 @@ class Template
 
     # call
     rule(:call) do
-      name.as(:name) >>
-        (operator.as(:operator) >> call.as(:call)).maybe >>
+      name.as(:name) >> (operator.as(:operator) >> call.as(:call)).maybe >>
         call_arguments.as(:arguments).maybe
     end
+
     # boolean
     rule(:boolean) { str('true') | str('false') }
 
@@ -160,27 +161,31 @@ class Template
     # statement
     rule(:define_statement) do
       define >> spaces >> name.as(:name) >>
-        define_arguments.as(:arguments).maybe >>
-        inner_statements.as(:body) >> end_keyword
+        define_arguments.as(:arguments).maybe >> inner_statements.as(:body) >>
+        end_keyword
     end
     rule(:if_statement) do
       if_keyword >> spaces >> statement.as(:if_statement) >>
-        inner_statements.as(:if_body) >> end_keyword
+        inner_statements.as(:if_body) >>
+        (
+          else_keyword >> spaces >> if_keyword >> spaces >>
+            statement.as(:else_if_statement) >>
+            inner_statements.as(:else_if_body)
+        ).maybe >> (else_keyword >> inner_statements.as(:else_body)).maybe >>
+        end_keyword
     end
     rule(:value_statement) do
       implicit_dictionnary.as(:dictionnary) | implicit_list.as(:list) | value
     end
     rule(:statement) do
-      (
-        define_statement.as(:define) | if_statement.as(:if) | value_statement
-      )
+      (define_statement.as(:define) | if_statement.as(:if) | value_statement)
     end
+
     # "}Home{", " 1 "
     rule(:inner_statements) do
       (
         (right_curly_bracket >> template.as(:template) >> left_curly_bracket) |
-        (space >> statement.repeat(1) >> space) |
-        spaces.ignore
+          (space >> statement.repeat(1) >> space) | spaces.ignore
       )
     end
     rule(:statements) { statement.repeat(1) }
