@@ -1,5 +1,3 @@
-require 'parslet'
-
 class Template
   class Number
     # 12,735.23 is parsed as { base_10: { whole: '12735', decimal: '23' } }

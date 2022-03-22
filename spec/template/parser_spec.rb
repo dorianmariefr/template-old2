@@ -1,4 +1,4 @@
-require_relative '../../template'
+require "spec_helper"
 
 RSpec.describe Template::Parser do
   let!(:template) { '' }

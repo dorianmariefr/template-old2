@@ -1,6 +1,4 @@
-require 'parslet'
 require_relative 'number/parser'
-require_relative 'helpers'
 
 class Template
   class Parser < Parslet::Parser

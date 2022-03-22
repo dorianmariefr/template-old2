@@ -1,4 +1,4 @@
-require_relative '../../../template/number/parser'
+require "spec_helper"
 
 RSpec.describe Template::Number::Parser do
   let!(:number) { '0' }

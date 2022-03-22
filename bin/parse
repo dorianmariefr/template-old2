@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+
+require_relative '../template'
+
+if ARGV.size < 1 || ARGV.size > 2
+  puts "USAGE: bin/parse TEMPLATE [--trace]"
+  abort
+end
+
+SOURCE = ARGV[0]
+TRACE = ARGV[1] == "--trace"
+
+begin
+  pp Template::Parser::Helpers.stringify(Template::Parser.new.parse(SOURCE))
+rescue Parslet::ParseFailed => e
+  Template::Error.print(e, trace: TRACE)
+end
