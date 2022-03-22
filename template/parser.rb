@@ -1,5 +1,6 @@
 require 'parslet'
 require_relative 'number/parser'
+require_relative 'helpers'
 
 class Template
   class Parser < Parslet::Parser
@@ -9,6 +10,8 @@ class Template
     rule(:right_curly_bracket) { str('}') }
     rule(:left_square_bracket) { str('[') }
     rule(:right_square_bracket) { str(']') }
+    rule(:left_parenthesis) { str('(') }
+    rule(:right_parenthesis) { str(')') }
     rule(:dot) { str('.') }
     rule(:double_quote) { str('"') }
     rule(:single_quote) { str("'") }
@@ -19,9 +22,14 @@ class Template
     rule(:greater_than) { str('>') }
     rule(:n) { str('n') }
     rule(:t) { str('t') }
+    rule(:define) { str('define') }
+    rule(:end_keyword) { str('end') }
+    rule(:if_keyword) { str('if') }
 
     # spaces
-    rule(:spaces) { match('\s').repeat(1) }
+    rule(:space) { str(' ') }
+    rule(:newline) { str("\n") }
+    rule(:spaces) { (space | newline).repeat(1) }
     rule(:spaces?) { spaces.maybe }
 
     # string
@@ -38,22 +46,19 @@ class Template
     rule(:double_quote_string) do
       double_quote.ignore >>
         (
-          (
-            interpolation.as(:interpolation) | expression.as(:expression) |
-              double_quote_string_character.repeat(1).as(:text)
-          ).repeat(0)
+          (code.as(:code) | double_quote_string_character.repeat(1).as(:text))
+            .repeat(0)
         ) >> double_quote.ignore
     end
     rule(:single_quote_string) do
       single_quote.ignore >>
         (
-          (
-            interpolation.as(:interpolation) | expression.as(:expression) |
-              single_quote_string_character.repeat(1).as(:text)
-          ).repeat(0)
+          (code.as(:code) | single_quote_string_character.repeat(1).as(:text))
+            .repeat(0)
         ) >> single_quote.ignore
     end
-    rule(:string) { double_quote_string | single_quote_string }
+    rule(:short_string) { colon.ignore >> name }
+    rule(:string) { double_quote_string | single_quote_string | short_string }
 
     # number
     rule(:number) { Template::Number::Parser.new }
@@ -62,11 +67,49 @@ class Template
     rule(:name_character) do
       left_curly_bracket.absent? >> right_curly_bracket.absent? >>
         left_square_bracket.absent? >> right_square_bracket.absent? >>
-        colon.absent? >> comma.absent? >> operator.absent? >> spaces.absent? >>
-        any
+        left_parenthesis.absent? >> right_parenthesis.absent? >>
+        colon.absent? >> comma.absent? >> operator.absent? >> space.absent? >>
+        newline.absent? >> any
     end
-    rule(:name) { name_character.repeat(1) }
+    rule(:name) do
+      define.absent? >> end_keyword.absent? >> if_keyword.absent? >>
+        name_character.repeat(1)
+    end
 
+    # define arguments
+    rule(:define_argument) do
+      (name.as(:value) >> colon >> (spaces? >> value.as(:default)).maybe) |
+        (
+          value.as(:value) >>
+            (spaces? >> equal >> spaces? >> value.as(:default)).maybe
+        )
+    end
+    rule(:define_arguments) do
+      left_parenthesis.ignore >> spaces?.ignore >>
+        (
+          define_argument.as(:first) >>
+            (spaces? >> comma >> spaces? >> define_argument)
+              .repeat(0)
+              .as(:others)
+        ).maybe >> spaces?.ignore >> right_parenthesis.ignore
+    end
+
+    # arguments
+    rule(:call_argument) { implicit_dictionnary.as(:dictionnary) | value }
+    rule(:call_arguments) do
+      left_parenthesis.ignore >> spaces?.ignore >>
+        (
+          call_argument.as(:first) >>
+            (spaces? >> comma >> spaces? >> call_argument).repeat(0).as(:others)
+        ).maybe >> spaces?.ignore >> right_parenthesis.ignore
+    end
+
+    # call
+    rule(:call) do
+      name.as(:name) >>
+        (operator.as(:operator) >> call.as(:call)).maybe >>
+        call_arguments.as(:arguments).maybe
+    end
     # boolean
     rule(:boolean) { str('true') | str('false') }
 
@@ -84,7 +127,7 @@ class Template
     end
     rule(:list) do
       left_square_bracket >> spaces? >> list_value.as(:first) >>
-      (comma >> spaces? >> list_value).repeat(0).as(:others) >> spaces? >>
+        (comma >> spaces? >> list_value).repeat(0).as(:others) >> spaces? >>
         right_square_bracket
     end
 
@@ -106,50 +149,57 @@ class Template
 
     # value
     rule(:value) do
-      dictionnary.as(:dictionnary) | list.as(:list) |
-      nothing.as(:nothing) | boolean.as(:boolean) | number.as(:number) |
-        string.as(:string) | name.as(:name)
+      dictionnary.as(:dictionnary) | list.as(:list) | nothing.as(:nothing) |
+        boolean.as(:boolean) | number.as(:number) | string.as(:string) |
+        call.as(:call)
     end
 
     # operator
     rule(:operator) { dot | equal | greater_than }
 
     # statement
+    rule(:define_statement) do
+      define >> spaces >> name.as(:name) >>
+        define_arguments.as(:arguments).maybe >>
+        inner_statements.as(:body) >> end_keyword
+    end
+    rule(:if_statement) do
+      if_keyword >> spaces >> statement.as(:if_statement) >>
+        inner_statements.as(:if_body) >> end_keyword
+    end
+    rule(:value_statement) do
+      implicit_dictionnary.as(:dictionnary) | implicit_list.as(:list) | value
+    end
     rule(:statement) do
-      (value >> operator.as(:operator) >> statement.as(:statement)) |
-        (implicit_dictionnary.as(:dictionnary) | implicit_list.as(:list) | value)
+      (
+        define_statement.as(:define) | if_statement.as(:if) | value_statement
+      )
+    end
+    # "}Home{", " 1 "
+    rule(:inner_statements) do
+      (
+        (right_curly_bracket >> template.as(:template) >> left_curly_bracket) |
+        (space >> statement.repeat(1) >> space) |
+        spaces.ignore
+      )
     end
     rule(:statements) { statement.repeat(1) }
 
-    # interpolation
-    rule(:opening_interpolation) { left_curly_bracket >> equal }
-    rule(:closing_interpolation) { right_curly_bracket }
-    rule(:interpolation) do
-      opening_interpolation.ignore >> spaces?.ignore >> statements >>
-        spaces?.ignore >> closing_interpolation.ignore
-    end
-
-    # expression
-    rule(:opening_expression) { left_curly_bracket }
-    rule(:closing_expression) { right_curly_bracket }
-    rule(:expression) do
-      opening_expression.ignore >> spaces?.ignore >> statements >>
-        spaces?.ignore >> closing_expression.ignore
+    # code
+    rule(:code) do
+      left_curly_bracket.ignore >> spaces?.ignore >> statements >>
+        spaces?.ignore >> right_curly_bracket.ignore
     end
 
     # text
-    rule(:unescaped_text_character) do
-      left_curly_bracket.absent? >> right_curly_bracket.absent? >> any
-    end
+    rule(:unescaped_text_character) { left_curly_bracket.absent? >> any }
     rule(:escaped_text_character) { backslash.ignore >> any }
     rule(:text_character) { escaped_text_character | unescaped_text_character }
     rule(:text) { text_character.repeat(1) }
 
+    # template
     rule(:template) do
-      (
-        interpolation.as(:interpolation) | expression.as(:expression) |
-          text.as(:text)
-      ).repeat(1) | empty.as(:text).repeat(1, 1)
+      (code.as(:code) | text.as(:text)).repeat(1) | empty.as(:text).repeat(1, 1)
     end
 
     root(:template)

@@ -1,29 +1,17 @@
-require_relative '../../template/parser'
+require_relative '../../template'
 
 RSpec.describe Template::Parser do
   let!(:template) { '' }
 
-  def sanitize(object)
-    if object.is_a?(Parslet::Slice)
-      object.to_s
-    elsif object.is_a?(Hash)
-      object.transform_values { |value| sanitize(value) }
-    elsif object.is_a?(Array)
-      object.map { |value| sanitize(value) }
-    else
-      raise NotImplementedError, object.class
-    end
-  end
-
   subject do
-    sanitize(described_class.new.parse(template))
+    Template::Helpers.sanitize(described_class.new.parse(template))
   rescue Parslet::ParseFailed => e
     puts e.parse_failure_cause.ascii_tree
     raise e
   end
 
-  def matches_expression(expression)
-    is_expected.to eq([{ expression: [expression] }])
+  def matches_code(code)
+    is_expected.to eq([{ code: [code] }])
   end
 
   it { is_expected.to eq([{ text: '' }]) }
@@ -35,30 +23,38 @@ RSpec.describe Template::Parser do
 
   context 'nothing' do
     let!(:template) { '{nothing}' }
-    it { matches_expression(nothing: 'nothing') }
+    it { matches_code(nothing: 'nothing') }
   end
 
   context 'boolean' do
     context 'true' do
       let!(:template) { '{true}' }
-      it { matches_expression(boolean: 'true') }
+      it { matches_code(boolean: 'true') }
     end
 
     context 'false' do
       let!(:template) { '{false}' }
-      it { matches_expression(boolean: 'false') }
+      it { matches_code(boolean: 'false') }
     end
   end
 
   context 'with an interpolation' do
-    let!(:template) { 'Hello {=user.first_name}' }
+    let!(:template) { 'Hello {user.first_name}' }
     it do
       is_expected.to eq(
         [
           { text: 'Hello ' },
           {
-            interpolation: [
-              { name: 'user', operator: '.', statement: { name: 'first_name' } }
+            code: [
+              {
+                call: {
+                  name: 'user',
+                  operator: '.',
+                  call: {
+                    name: 'first_name'
+                  }
+                }
+              }
             ]
           }
         ]
@@ -71,14 +67,22 @@ RSpec.describe Template::Parser do
     it { is_expected.to eq([{ text: 'Hello {{user.first_name}}' }]) }
   end
 
-  context 'with an expression' do
+  context 'with an code' do
     let!(:template) { '{users.pop}' }
     it do
       is_expected.to eq(
         [
           {
-            expression: [
-              { name: 'users', operator: '.', statement: { name: 'pop' } }
+            code: [
+              {
+                call: {
+                  name: 'users',
+                  operator: '.',
+                  call: {
+                    name: 'pop'
+                  }
+                },
+              }
             ]
           }
         ]
@@ -88,7 +92,7 @@ RSpec.describe Template::Parser do
 
   context 'strings' do
     def matches_string(string)
-      is_expected.to eq([{ expression: [{ string: [{ text: string }] }] }])
+      is_expected.to eq([{ code: [{ string: [{ text: string }] }] }])
     end
 
     context 'double quote' do
@@ -107,13 +111,18 @@ RSpec.describe Template::Parser do
     end
 
     context 'interpolation' do
-      let!(:template) { '{"Hello {=user}"}' }
+      let!(:template) { '{"Hello {user}"}' }
 
       it do
-        matches_expression(
-          string: [{ text: 'Hello ' }, { interpolation: [{ name: 'user' }] }]
+        matches_code(
+          string: [{ text: 'Hello ' }, { code: [{ call: { name: 'user' } }] }]
         )
       end
+    end
+
+    context 'short string' do
+      let!(:template) { '{:name}' }
+      it { matches_code(string: 'name') }
     end
   end
 
@@ -122,7 +131,7 @@ RSpec.describe Template::Parser do
       let!(:template) { '{[true, false, nothing]}' }
 
       it do
-        matches_expression(
+        matches_code(
           list: {
             first: {
               boolean: 'true'
@@ -137,7 +146,7 @@ RSpec.describe Template::Parser do
       let!(:template) { '{true, false, nothing}' }
 
       it do
-        matches_expression(
+        matches_code(
           list: {
             first: {
               boolean: 'true'
@@ -155,7 +164,7 @@ RSpec.describe Template::Parser do
       let!(:template) { '{true, [false, true], nothing}' }
 
       it do
-        matches_expression(
+        matches_code(
           list: {
             first: {
               boolean: 'true'
@@ -180,7 +189,7 @@ RSpec.describe Template::Parser do
       let!(:template) { '{{name: "Dorian"}}' }
 
       it do
-        matches_expression(
+        matches_code(
           dictionnary: {
             first: {
               key: {
@@ -200,7 +209,7 @@ RSpec.describe Template::Parser do
       let!(:template) { '{{name: "Dorian", twitter: "@dorianmariefr"}}' }
 
       it do
-        matches_expression(
+        matches_code(
           dictionnary: {
             first: {
               key: {
@@ -229,7 +238,7 @@ RSpec.describe Template::Parser do
       let!(:template) { '{name: "Dorian"}' }
 
       it do
-        matches_expression(
+        matches_code(
           dictionnary: {
             first: {
               key: {
@@ -249,7 +258,7 @@ RSpec.describe Template::Parser do
       let!(:template) { '{name: "Dorian", twitter: "@dorianmariefr"}' }
 
       it do
-        matches_expression(
+        matches_code(
           dictionnary: {
             first: {
               key: {
@@ -267,7 +276,7 @@ RSpec.describe Template::Parser do
                 value: {
                   string: [{ text: '@dorianmariefr' }]
                 }
-              },
+              }
             ]
           }
         )
@@ -275,18 +284,28 @@ RSpec.describe Template::Parser do
     end
   end
 
-  context "implicit dictionnary inside a list" do
+  context 'implicit dictionnary inside a list' do
     let!(:template) { '{1, name: "Dorian"}' }
 
     it do
-      matches_expression(
+      matches_code(
         list: {
-          first: { number: { base_10: { whole: "1" } } },
+          first: {
+            number: {
+              base_10: {
+                whole: '1'
+              }
+            }
+          },
           second: {
             dictionnary: {
               first: {
-                key: { string: "name" },
-                value: { string: [{ text: "Dorian" }] }
+                key: {
+                  string: 'name'
+                },
+                value: {
+                  string: [{ text: 'Dorian' }]
+                }
               },
               others: []
             }
@@ -294,6 +313,236 @@ RSpec.describe Template::Parser do
           others: []
         }
       )
+    end
+  end
+
+  context 'calls' do
+    context 'with no arguments and no parenthesis' do
+      let!(:template) { '{name.split}' }
+
+      it do
+        matches_code(
+          call: {
+            name: 'name',
+            operator: '.',
+            call: {
+              name: 'split'
+            }
+          }
+        )
+      end
+    end
+
+    context 'with no arguments and parenthesis' do
+      let!(:template) { '{name.split()}' }
+
+      it do
+        matches_code(
+          call: {
+            name: 'name',
+            operator: '.',
+            call: {
+              name: 'split',
+              arguments: ''
+            }
+          }
+        )
+      end
+    end
+
+    context 'with single argument' do
+      let!(:template) { '{name.split(" ")}' }
+
+      it do
+        matches_code(
+          call: {
+            name: 'name',
+            operator: '.',
+            call: {
+              name: 'split',
+              arguments: {
+                first: {
+                  string: [{ text: ' ' }]
+                },
+                others: []
+              }
+            }
+          }
+        )
+      end
+    end
+
+    context 'with multiple arguments' do
+      let!(:template) { '{name.split(" ", 2)}' }
+
+      it do
+        matches_code(
+          call: {
+            name: 'name',
+            operator: '.',
+            call: {
+              name: 'split',
+              arguments: {
+                first: {
+                  string: [{ text: ' ' }]
+                },
+                others: [{ number: { base_10: { whole: '2' } } }]
+              }
+            }
+          }
+        )
+      end
+    end
+  end
+
+  context 'define' do
+    context 'function with no arguments and inline body' do
+      let!(:template) { '{define title "Home" end}' }
+
+      it do
+        matches_code(
+          define: {
+            name: 'title',
+            body: [{ string: [{ text: 'Home' }] }]
+          }
+        )
+      end
+    end
+
+    context 'function with no arguments and text body' do
+      let!(:template) { '{define title}Home{end}' }
+
+      it do
+        matches_code(
+          define: {
+            name: 'title',
+            body: { template: [{ text: 'Home' }] }
+          }
+        )
+      end
+    end
+
+    context 'function with empty arguments and inline body' do
+      let!(:template) { '{define title() "Home" end}' }
+
+      it do
+        matches_code(
+          define: {
+            name: 'title',
+            arguments: '',
+            body: [{ string: [{ text: 'Home' }] }]
+          }
+        )
+      end
+    end
+
+    context 'function with single arguments and inline body' do
+      let!(:template) { '{define title() "Home" end}' }
+
+      it do
+        matches_code(
+          define: {
+            name: 'title',
+            arguments: '',
+            body: [{ string: [{ text: 'Home' }] }]
+          }
+        )
+      end
+    end
+
+    context 'with with default argument' do
+      let!(:template) { '{define link_to(text, url = "/") end}' }
+
+      it do
+        matches_code(
+          define: {
+            name: 'link_to',
+            body: nil,
+            arguments: {
+              first: {
+                value: {
+                  call: {
+                    name: 'text'
+                  }
+                }
+              },
+              others: [
+                value: {
+                  call: {
+                    name: 'url'
+                  }
+                },
+                default: {
+                  string: [{ text: '/' }]
+                }
+              ]
+            }
+          }
+        )
+      end
+    end
+
+    context 'with with default keyword argument' do
+      let!(:template) do
+        '{define order(column: :created_at, direction: :asc) end}'
+      end
+
+      it do
+        matches_code(
+          define: {
+            name: 'order',
+            body: nil,
+            arguments: {
+              first: {
+                value: 'column',
+                default: {
+                  string: 'created_at'
+                }
+              },
+              others: [value: 'direction', default: { string: 'asc' }]
+            }
+          }
+        )
+      end
+    end
+  end
+
+  context 'if, else if, else' do
+    context 'if value' do
+      let!(:template) { '{if item.parent}{render(item.parent)}{end}'}
+
+      it do
+        matches_code(
+          if: {
+            if_statement: {
+              call: {
+                name: 'item',
+                operator: '.',
+                call: { name: 'parent' }
+              }
+            },
+            if_body: {
+              template: [{
+                code: [{
+                  call: {
+                    name: 'render',
+                    arguments: {
+                      first: {
+                        call: {
+                          name: 'item',
+                          operator: '.',
+                          call: { name: 'parent' }
+                        }
+                      },
+                      others: []
+                    }
+                  }
+                }]
+              }]
+            }
+          }
+        )
+      end
     end
   end
 end
