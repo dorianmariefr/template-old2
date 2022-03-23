@@ -2,8 +2,8 @@
 
 require_relative '../template'
 
-if ARGV.size < 1 || ARGV.size > 2
-  puts "USAGE: bin/parse TEMPLATE [--trace]"
+if ARGV.size != 1 && ARGV.size != 2
+  puts "USAGE: bin/transform TEMPLATE [--trace]"
   abort
 end
 
@@ -16,7 +16,7 @@ end
 TRACE = ARGV[1] == "--trace"
 
 begin
-  pp Template::Parser::Helpers.stringify(Template::Parser.new.parse(SOURCE))
+  pp Template::Node::Template.parse(SOURCE).to_h
 rescue Parslet::ParseFailed => e
   Template::Error.print(e, trace: TRACE)
 end

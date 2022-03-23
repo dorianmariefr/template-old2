@@ -1,10 +1,10 @@
-require "spec_helper"
+require 'spec_helper'
 
 RSpec.describe Template::Parser do
   let!(:template) { '' }
 
   subject do
-    Template::Helpers.sanitize(described_class.new.parse(template))
+    Template::Parser::Helpers.stringify(Template::Parser.new.parse(template))
   rescue Parslet::ParseFailed => e
     puts e.parse_failure_cause.ascii_tree
     raise e

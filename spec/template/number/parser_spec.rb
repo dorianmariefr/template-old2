@@ -1,4 +1,4 @@
-require "spec_helper"
+require 'spec_helper'
 
 RSpec.describe Template::Number::Parser do
   let!(:number) { '0' }

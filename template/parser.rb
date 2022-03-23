@@ -159,18 +159,15 @@ class Template
     # statement
     rule(:define_statement) do
       define >> spaces >> name.as(:name) >>
-        define_arguments.as(:arguments).maybe >> inner_statements.as(:body) >>
-        end_keyword
+        define_arguments.as(:arguments).maybe >> body.as(:body) >> end_keyword
     end
     rule(:if_statement) do
       if_keyword >> spaces >> statement.as(:if_statement) >>
-        inner_statements.as(:if_body) >>
+        body.as(:if_body) >>
         (
           else_keyword >> spaces >> if_keyword >> spaces >>
-            statement.as(:else_if_statement) >>
-            inner_statements.as(:else_if_body)
-        ).maybe >> (else_keyword >> inner_statements.as(:else_body)).maybe >>
-        end_keyword
+            statement.as(:else_if_statement) >> body.as(:else_if_body)
+        ).maybe >> (else_keyword >> body.as(:else_body)).maybe >> end_keyword
     end
     rule(:value_statement) do
       implicit_dictionnary.as(:dictionnary) | implicit_list.as(:list) | value
@@ -178,15 +175,15 @@ class Template
     rule(:statement) do
       (define_statement.as(:define) | if_statement.as(:if) | value_statement)
     end
+    rule(:statements) { statement.repeat(1) }
 
-    # "}Home{", " 1 "
-    rule(:inner_statements) do
+    # body
+    rule(:body) do
       (
         (right_curly_bracket >> template.as(:template) >> left_curly_bracket) |
           (space >> statement.repeat(1) >> space) | spaces.ignore
       )
     end
-    rule(:statements) { statement.repeat(1) }
 
     # code
     rule(:code) do

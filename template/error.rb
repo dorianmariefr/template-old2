@@ -16,7 +16,9 @@ class Template
     def index
       i = 0
       error = self
-      i += 1 while error = error.parent
+      while error = error.parent
+        i += 1
+      end
       i
     end
 
@@ -25,9 +27,7 @@ class Template
     end
 
     def print
-      if parent && trace
-        parent.print
-      end
+      parent.print if parent && trace
 
       puts prefix + message
       puts prefix + source

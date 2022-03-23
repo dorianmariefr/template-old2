@@ -1,0 +1,13 @@
+{define render(item)}
+  <p>{link_to(item.user.name, item.user.url)}</p>
+
+  {markdown(item.content)}
+
+  <p>{link_to(item.created_at.to_formatted_s(:long), item.url)}</p>
+
+  {if item.parent}
+    {render(item.parent)}
+  {end}
+{end}
+
+{render(item)}
